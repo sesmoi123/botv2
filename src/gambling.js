@@ -12,7 +12,7 @@ const {
   TextInputStyle,
 } = require("discord.js");
 
-const DATA_DIRECTORY = path.join(__dirname, "..", "data");
+const DATA_DIRECTORY = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR.trim()) : path.join(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIRECTORY, "gambling.json");
 const GAMBLE_PANEL_MARKER = "emilie-gamble-panel";
 

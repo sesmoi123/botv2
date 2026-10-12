@@ -10,7 +10,8 @@ const messageHistory = new Map();
 const joinHistory = new Map();
 const lastRaidAlerts = new Map();
 const lockdownTimers = new Map();
-const LOCKDOWN_DATA_FILE = path.join(__dirname, "..", "data", "raid-lockdowns.json");
+const DATA_DIRECTORY = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR.trim()) : path.join(__dirname, "..", "data");
+const LOCKDOWN_DATA_FILE = path.join(DATA_DIRECTORY, "raid-lockdowns.json");
 let lastMessageHistoryCleanup = 0;
 
 function readLockdowns() {

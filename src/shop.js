@@ -11,7 +11,7 @@ const {
 } = require("discord.js");
 const { getUserBalance, updateBalance } = require("./gambling");
 
-const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR.trim()) : path.join(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "shop.json");
 
 const SHOP_PANEL_MARKER = "emilie-shop-panel";

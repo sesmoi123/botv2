@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require("discord.js");
 
-const DATA_DIRECTORY = path.join(__dirname, "..", "data");
+const DATA_DIRECTORY = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR.trim()) : path.join(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIRECTORY, "giveaways.json");
 const GIVEAWAY_BUTTON_PREFIX = "giveaway:join:";
 const DURATION_MS = {
