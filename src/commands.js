@@ -108,6 +108,20 @@ const commands = [
         .setRequired(true),
     ),
   new SlashCommandBuilder()
+    .setName("gift")
+    .setDescription("Donne des pièces à quelqu'un si tu as le rôle ARSAL.")
+    .addUserOption((option) =>
+      option.setName("membre").setDescription("Membre qui reçoit les pièces.").setRequired(true),
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName("pieces")
+        .setDescription("Nombre de pièces à donner.")
+        .setMinValue(1)
+        .setMaxValue(1000000)
+        .setRequired(true),
+    ),
+  new SlashCommandBuilder()
     .setName("deletepiece")
     .setDescription("Crée un bouton qui retire un montant précis de pièces à chaque clic.")
     .addIntegerOption((option) =>

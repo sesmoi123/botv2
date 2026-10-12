@@ -63,14 +63,18 @@ function createRoulettePanel() {
     .setColor(0x168a52)
     .setTitle("🎡 Roulette européenne")
     .setDescription([
-      "Choisis ton pari puis ta mise. La roue comporte **37 cases** : 0 à 36.",
+      "1) Clique sur **Jouer à la roulette**",
+      "2) Choisis un pari : **Rouge / Noir / Pair / Impair / Petit / Grand / Numéro exact**",
+      "3) Écris ta mise en pièces",
+      "4) Le bot tire un nombre entre **0 et 36**",
       "",
-      "🔴 **Rouge** ou ⚫ **Noir** — 18 numéros, paiement **1:1**",
-      "**Pair / impair** ou **petit (1–18) / grand (19–36)** — paiement **1:1**",
-      "🎯 **Numéro précis** de 0 à 36 — paiement **35:1**",
+      "✅ **Règles simples**",
+      "• **Rouge / Noir / Pair / Impair / Petit / Grand** : gagne **1 fois ta mise**",
+      "• **Numéro exact** : gagne **35 fois ta mise**",
+      "• **0** = vert et il fait perdre les paris de couleur, pair/impair et petit/grand",
+      "• Si tu perds, tu perds ta mise. Si tu gagnes, tu reçois ton gain selon le pari choisi.",
       "",
-      "Le **0 est vert** et fait perdre les paris rouge/noir, pair/impair et petit/grand. Le gain indiqué est le bénéfice net; la mise est conservée en cas de victoire.",
-      "Jeu avec des pièces virtuelles uniquement : aucun pari ne garantit un gain.",
+      "C’est un jeu avec des pièces virtuelles uniquement.",
     ].join("\n"))
     .setFooter({ text: ROULETTE_PANEL_MARKER });
   const row = new ActionRowBuilder().addComponents(

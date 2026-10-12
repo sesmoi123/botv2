@@ -289,6 +289,39 @@ async function handleCommand(interaction) {
     return;
   }
 
+  if (commandName === "gift") {
+    if (!(isAuthorized(interaction.user.id) || hasRole(interaction, config.arsalRoleId) || hasStaffRole(interaction))) {
+      await interaction.reply({
+        content: `Tu dois avoir le rôle <@&${config.arsalRoleId}> pour donner des pièces.`,
+        allowedMentions: { parse: [] },
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const target = interaction.options.getUser("membre", true);
+    const amount = interaction.options.getInteger("pieces", true);
+
+    if (target.id === interaction.user.id) {
+      await interaction.editReply({ content: "Tu ne peux pas te donner des pièces à toi-même." });
+      return;
+    }
+
+    const senderBalance = getUserBalance(interaction.user.id);
+    if (amount > senderBalance) {
+      await interaction.editReply({ content: `Tu n'as pas assez de pièces pour donner ${amount}. Ton solde est de ${senderBalance}.` });
+      return;
+    }
+
+    updateBalance(interaction.user.id, -amount);
+    const targetBalance = addBalance(target.id, amount);
+    await interaction.editReply({
+      content: `Tu as donné ${amount} pièce(s) à ${target.tag}. Nouveau solde de ${target.tag} : ${targetBalance}.`,
+    });
+    return;
+  }
+
   if (commandName === "givepiece") {
     await handleAdminCommand(interaction, async () => {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
