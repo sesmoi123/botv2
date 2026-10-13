@@ -15,9 +15,11 @@ const CREATE_TICKET_BUTTON = "ticket:create";
 const CLOSE_TICKET_BUTTON = "ticket:close";
 const TICKET_REASON_MODAL = "ticket:reason";
 const TICKET_PANEL_MARKER = "emilie-ticket-panel";
+const pendingTicketOwners = new Set();
 
 function isTicketChannel(channel) {
-  return channel?.type === ChannelType.GuildText && channel.topic?.startsWith("ticket-owner:");
+  return channel?.type === ChannelType.GuildText
+    && (channel.topic?.startsWith("ticket-owner:") || channel.topic?.startsWith("purchase-owner:"));
 }
 
 function ticketOwnerId(channel) {
@@ -49,11 +51,26 @@ function hasStaffAccess(interaction, config) {
 }
 
 async function openTicketChannel({ interaction, config, reason }) {
+  if (pendingTicketOwners.has(interaction.user.id)) {
+    await interaction.editReply({ content: "La création de ton ticket est déjà en cours." });
+    return null;
+  }
+  pendingTicketOwners.add(interaction.user.id);
+  try {
+    return await createTicketChannel({ interaction, config, reason });
+  } finally {
+    pendingTicketOwners.delete(interaction.user.id);
+  }
+}
+
+async function createTicketChannel({ interaction, config, reason }) {
   const guild = interaction.guild;
   if (!guild) throw new Error("Impossible de trouver le serveur pour créer le ticket.");
 
   const existing = guild.channels.cache.find(
-    (channel) => channel.type === ChannelType.GuildText && ticketOwnerId(channel) === interaction.user.id,
+    (channel) => channel.type === ChannelType.GuildText
+      && channel.parentId !== config.buyCategoryId
+      && ticketOwnerId(channel) === interaction.user.id,
   );
   if (existing) {
     await interaction.editReply({ content: `Tu as déjà un ticket ouvert : ${existing}` });

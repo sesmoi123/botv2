@@ -187,6 +187,17 @@ async function handleCommand(interaction) {
       await inventoryCommand(interaction);
       return;
     }
+    if (subcommand === "piece") {
+      await handleAdminCommand(interaction, async () => {
+        const target = interaction.options.getUser("membre", true);
+        const balance = getUserBalance(target.id);
+        await interaction.reply({
+          content: `${target.tag} possède ${balance} pièce(s).`,
+          flags: MessageFlags.Ephemeral,
+        });
+      });
+      return;
+    }
   }
 
   if (!canUseCommands(interaction)) {
@@ -495,6 +506,34 @@ async function synchronizeExistingMemberRoles(guild) {
   console.log(`Vérification des rôles et des pseudos boosters terminée pour le serveur ${guild.name}.`);
 }
 
+function startSupportTagRewards(discordClient) {
+  if (!config.supportTagRoleId) return;
+
+  let distributionInProgress = false;
+  setInterval(async () => {
+    if (distributionInProgress) return;
+    distributionInProgress = true;
+    try {
+      const guild = await discordClient.guilds.fetch(config.guildId);
+      const role = await guild.roles.fetch(config.supportTagRoleId);
+      if (!role) throw new Error(`Rôle Soutien tag introuvable : ${config.supportTagRoleId}`);
+
+      const members = await guild.members.fetch();
+      let rewarded = 0;
+      for (const member of members.values()) {
+        if (member.user.bot || !member.roles.cache.has(role.id)) continue;
+        addBalance(member.id, 5);
+        rewarded += 1;
+      }
+      console.log(`Récompense Soutien tag : 5 pièces attribuées à ${rewarded} membre(s).`);
+    } catch (error) {
+      console.error("Impossible d'attribuer les pièces périodiques du rôle Soutien tag :", error);
+    } finally {
+      distributionInProgress = false;
+    }
+  }, 10 * 60 * 1000).unref();
+}
+
 async function sendWelcomeMessage(member) {
   if (member.user.bot) return;
   const welcomeText = [
@@ -525,6 +564,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     void logToChannel(readyClient, config, "Bot connecté", `${readyClient.user.tag} est en ligne et les commandes sont synchronisées.`);
     try {
       const guild = await readyClient.guilds.fetch(config.guildId);
+      startSupportTagRewards(readyClient);
       await synchronizeExistingMemberRoles(guild);
     } catch (error) {
       console.error(`Impossible de vérifier les rôles des membres déjà présents sur le serveur ${config.guildId}:`, error);

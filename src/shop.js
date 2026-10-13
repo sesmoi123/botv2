@@ -23,10 +23,11 @@ const DELETE_PIECE_PANEL_MARKER = "emilie-delete-piece-panel";
 const deletePieceMessageState = new Map();
 
 const ITEMS = [
-  { id: "netflix", label: "Netflix", price: 1800, emoji: "<:netflix:1559227785111797800>" },
-  { id: "spotify", label: "Spotify", price: 1700, emoji: "<:spotify:1559230561820868618>" },
-  { id: "crunchy", label: "Crunchyroll", price: 2000, emoji: "<:crunchy:1559228162414743556>" },
+  { id: "netflix", label: "Netflix", price: 2800, emoji: "<:netflix:1559227785111797800>" },
+  { id: "spotify", label: "Spotify", price: 2500, emoji: "<:spotify:1559230561820868618>" },
+  { id: "crunchy", label: "Crunchyroll", price: 3500, emoji: "<:crunchy:1559228162414743556>" },
 ];
+const pendingPurchases = new Set();
 
 function readShopData() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -100,70 +101,118 @@ async function handleShopButton(interaction, config) {
   await interaction.reply({ content: `Ton solde : ${getUserBalance(interaction.user.id)} pièces. Choisis le compte à acheter :`, components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral });
 }
 
-async function completePurchase(interaction, config, item, price, messageId) {
-  const meta = shopData[messageId] ?? { usesRemaining: null };
-  if (meta.usesRemaining === 0) {
-    await interaction.reply({ content: "Cet article n'est plus disponible (plus d'utilisations).", flags: MessageFlags.Ephemeral });
+async function completePurchase(interaction, config, item, messageId) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  if (pendingPurchases.has(interaction.user.id)) {
+    await interaction.editReply({ content: "Un de tes achats est déjà en cours." });
     return;
   }
 
-  if (Number.isInteger(meta.usesRemaining)) {
-    meta.usesRemaining -= 1;
-    shopData[messageId] = meta;
-    saveShopData(shopData);
-  }
-  const guild = interaction.guild;
-  const itemName = item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const pseudo = interaction.user.username.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "user";
-  const channelName = `${itemName}-${pseudo}`.slice(0, 90);
-  const categoryId = config.buyCategoryId;
-  const everyone = guild.roles.everyone;
-  const member = await guild.members.fetch(interaction.user.id);
-  const botMember = guild.members.me;
-
-  const permissionOverwrites = [
-    { id: everyone.id, deny: ["ViewChannel"] },
-    { id: member.id, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
-  ];
-
-  for (const roleId of config.ticketStaffRoleIds) {
-    permissionOverwrites.push({ id: roleId, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] });
-  }
-  permissionOverwrites.push({ id: botMember.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] });
-
-  let channel;
+  pendingPurchases.add(interaction.user.id);
   try {
-    channel = await guild.channels.create({
-      name: channelName,
-      type: 0,
-      parent: categoryId,
-      topic: `ticket-owner:${interaction.user.id}`,
-      permissionOverwrites,
-      reason: `Achat ${item.label} par ${interaction.user.tag}`,
-    });
-  } catch (error) {
-    console.error(`Impossible de créer le salon d'achat pour ${interaction.user.id}:`, error);
-    await interaction.reply({ content: "Impossible de créer le salon privé. Contacte un administrateur.", flags: MessageFlags.Ephemeral });
-    return;
+    const meta = shopData[messageId] ?? { usesRemaining: null };
+    if (meta.usesRemaining === 0) {
+      await interaction.editReply({ content: "Cet article n'est plus disponible (plus d'utilisations)." });
+      return;
+    }
+
+    const guild = interaction.guild;
+    if (!guild) {
+      await interaction.editReply({ content: "Les achats sont disponibles uniquement sur le serveur." });
+      return;
+    }
+    const existingPurchase = guild.channels.cache.find((channel) =>
+      channel.type === 0
+      && (
+        channel.topic?.startsWith(`purchase-owner:${interaction.user.id}`)
+        || (channel.parentId === config.buyCategoryId && channel.topic?.startsWith(`ticket-owner:${interaction.user.id}`))
+      ),
+    );
+    if (existingPurchase) {
+      await interaction.editReply({ content: `Tu as déjà un salon d'achat ouvert : ${existingPurchase}` });
+      return;
+    }
+
+    const balance = getUserBalance(interaction.user.id);
+    if (balance < item.price) {
+      await interaction.editReply({ content: `Il te faut ${item.price} pièces pour acheter ${item.label}. Ton solde est de ${balance} pièces.` });
+      return;
+    }
+
+    const itemName = item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const pseudo = interaction.user.username.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "user";
+    const channelName = `${itemName}-${pseudo}`.slice(0, 90);
+    const categoryId = config.buyCategoryId;
+    const everyone = guild.roles.everyone;
+    const member = await guild.members.fetch(interaction.user.id);
+    const botMember = guild.members.me;
+
+    const permissionOverwrites = [
+      { id: everyone.id, deny: ["ViewChannel"] },
+      { id: member.id, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
+    ];
+
+    for (const roleId of config.ticketStaffRoleIds) {
+      permissionOverwrites.push({ id: roleId, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] });
+    }
+    permissionOverwrites.push({ id: botMember.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] });
+
+    let channel;
+    try {
+      channel = await guild.channels.create({
+        name: channelName,
+        type: 0,
+        parent: categoryId,
+        topic: `purchase-owner:${interaction.user.id}`,
+        permissionOverwrites,
+        reason: `Achat ${item.label} par ${interaction.user.tag}`,
+      });
+    } catch (error) {
+      console.error(`Impossible de créer le salon d'achat pour ${interaction.user.id}:`, error);
+      await interaction.editReply({ content: "Impossible de créer le salon privé. Contacte un administrateur." });
+      return;
+    }
+
+    if (getUserBalance(interaction.user.id) < item.price) {
+      await channel.delete("Solde insuffisant au moment de valider l'achat.");
+      await interaction.editReply({ content: `Ton solde a changé pendant l'achat; il te faut ${item.price} pièces.` });
+      return;
+    }
+
+    const staffPings = config.ticketStaffRoleIds.map((r) => `<@&${r}>`).join(" ");
+    const embed = new EmbedBuilder()
+      .setTitle(`Achat : ${item.label}`)
+      .setDescription(`${interaction.user} a acheté **${item.label}** pour **${item.price}** pièces.`);
+    const closeRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("ticket:close")
+        .setLabel("Fermer le salon")
+        .setStyle(ButtonStyle.Danger),
+    );
+    try {
+      await channel.send({
+        content: `${interaction.user} ${staffPings}`,
+        embeds: [embed],
+        components: [closeRow],
+      });
+    } catch (error) {
+      console.error(`Impossible d'envoyer le récapitulatif dans le salon d'achat ${channel.id}:`, error);
+      await channel.delete("Impossible d'initialiser le salon d'achat.").catch((deleteError) => {
+        console.error(`Impossible de supprimer le salon d'achat incomplet ${channel.id}:`, deleteError);
+      });
+      throw error;
+    }
+
+    updateBalance(interaction.user.id, -item.price);
+    if (Number.isInteger(meta.usesRemaining)) {
+      meta.usesRemaining -= 1;
+      shopData[messageId] = meta;
+      saveShopData(shopData);
+    }
+    await interaction.editReply({ content: `Achat validé pour ${item.price} pièces — salon créé : ${channel}. Un membre du staff va te répondre.` });
+  } finally {
+    pendingPurchases.delete(interaction.user.id);
   }
-
-  const staffPings = config.ticketStaffRoleIds.map((r) => `<@&${r}>`).join(" ");
-  const embed = new EmbedBuilder()
-    .setTitle(`Achat : ${item.label}`)
-    .setDescription(`${interaction.user} a acheté **${item.label}** pour **${price}** pièces.`);
-  const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId("ticket:close")
-      .setLabel("Fermer le salon")
-      .setStyle(ButtonStyle.Danger),
-  );
-  await channel.send({
-    content: `${interaction.user} ${staffPings}`,
-    embeds: [embed],
-    components: [closeRow],
-  });
-
-  await interaction.reply({ content: `Achat validé — salon créé : ${channel}. Un membre du staff va te répondre.`, flags: MessageFlags.Ephemeral });
 }
 
 async function handleShopSelect(interaction, config) {
@@ -172,28 +221,26 @@ async function handleShopSelect(interaction, config) {
     return;
   }
 
-  const [itemId, priceStr] = interaction.values[0].split(":");
-  const price = Number(priceStr);
+  const [itemId] = interaction.values[0].split(":");
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item) {
     await interaction.reply({ content: "Article inconnu.", flags: MessageFlags.Ephemeral });
     return;
   }
 
-  await completePurchase(interaction, config, item, price, interaction.message.id);
+  await completePurchase(interaction, config, item, interaction.message.id);
 }
 
 async function handleShopModalSubmit(interaction, config) {
   const raw = interaction.customId.slice(SHOP_MODAL_PREFIX.length);
-  const [itemId, priceStr, messageId] = raw.split(":");
-  const price = Number(priceStr);
+  const [itemId, , messageId] = raw.split(":");
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item) {
     await interaction.reply({ content: "Article inconnu.", flags: MessageFlags.Ephemeral });
     return;
   }
 
-  await completePurchase(interaction, config, item, price, messageId);
+  await completePurchase(interaction, config, item, messageId);
 }
 
 function createDeletePiecePanel(amount, usesRemaining) {

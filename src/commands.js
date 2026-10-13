@@ -154,6 +154,14 @@ const commands = [
     .setDescription("Commandes de vérification.")
     .addSubcommand((subcommand) =>
       subcommand.setName("inventory").setDescription("Affiche le nombre de pièces de ton compte."),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("piece")
+        .setDescription("Affiche le nombre de pièces d'un membre (administrateurs uniquement).")
+        .addUserOption((option) =>
+          option.setName("membre").setDescription("Membre dont tu veux vérifier le solde.").setRequired(true),
+        ),
     ),
   new SlashCommandBuilder()
     .setName("ticket")
